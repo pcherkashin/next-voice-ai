@@ -4,19 +4,47 @@ import VoiceButton from './components/VoiceButton'
 
 const VoiceAssistantPage = () => {
   const [isRecording, setIsRecording] = useState(false)
-  const [audioUrl, setAudioUrl] = useState(null)
-  const [transcription, setTranscription] = useState(null)
-  const [answer, setAnswer] = useState(null)
-  const [audioSrc, setAudioSrc] = useState('')
-
+  const [results, setResults] = useState([])
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalContent, setModalContent] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
   const mediaRecorderRef = useRef(null)
   let audioChunks = []
 
-  const handlePlayAudio = () => {
-    if (audioSrc) {
-      const audio = new Audio(audioSrc)
-      audio.play()
+  const handlePlayAudio = (index) => {
+    const resultsCopy = [...results]
+    const result = resultsCopy[index]
+
+    if (!result.isPlaying) {
+      result.audio = new Audio(result.audioSrc)
+      result.audio.play()
+      result.isPlaying = true
+      result.buttonText = 'Stop'
+      result.audio.onended = () => {
+        // Ensure this event is set correctly
+        result.isPlaying = false
+        result.buttonText = 'Play'
+        setResults([...resultsCopy]) // Update the state to trigger a re-render
+      }
+    } else {
+      if (result.audio) {
+        result.audio.pause()
+        result.audio.currentTime = 0
+      }
+      result.isPlaying = false
+      result.buttonText = 'Play'
+      setResults([...resultsCopy]) // Update the state to trigger a re-render
     }
+  }
+
+  const handleModal = (text) => {
+    setModalContent(text)
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setModalOpen(false)
+    setModalContent('')
   }
 
   const handleRecording = () => {
@@ -27,12 +55,9 @@ const VoiceAssistantPage = () => {
     }
   }
 
-  useEffect(() => {
-    console.log('setAnswer:', answer)
-  }, [answer])
-
   const startRecording = () => {
     setIsRecording(true)
+    setIsProcessing(true)
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
@@ -49,50 +74,48 @@ const VoiceAssistantPage = () => {
 
         mediaRecorder.onstop = () => {
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
-          const formData = new FormData()
-          formData.append(
-            'audioData',
-            new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
-          )
           const audioUrl = URL.createObjectURL(audioBlob)
-          console.log('Recording stopped. File available at:', audioUrl)
-          setAudioUrl(audioUrl)
           audioChunks = []
 
-          handleTranscription(formData)
+          handleTranscription(audioUrl, audioBlob)
         }
       })
       .catch((error) => {
         console.error('Error during transcription:', error)
+        setIsProcessing(false)
       })
   }
 
-  const handleTranscription = (formData) => {
+  const handleTranscription = (audioUrl, audioBlob) => {
+    const formData = new FormData()
+    formData.append(
+      'audioData',
+      new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
+    )
+
     fetch('http://localhost:5000/api/transcribe', {
       method: 'POST',
       body: formData,
     })
       .then((response) => response.json())
       .then((data) => {
-        console.log('Transcription:', data.text)
-        setTranscription(data.text)
-        handleAnswer(data.text)
+        const transcription = data.text
+        handleAnswer(transcription, audioUrl)
       })
       .catch((error) => {
         console.error('Error during transcription processing:', error)
-        setTranscription('Error getting transcription')
       })
   }
 
-  const handleAnswer = (prompt) => {
+  const handleAnswer = (transcription, audioUrl) => {
     fetch('http://localhost:5000/api/answer', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt: transcription }),
     })
-      .then((response) => response.json()) // This assumes the server responds with Content-Type: application/json
+      .then((response) => response.json())
       .then((data) => {
         // Parse the stringified JSON data into an object
         const parsedData = JSON.parse(data)
@@ -100,41 +123,71 @@ const VoiceAssistantPage = () => {
 
         if (parsedData && parsedData.response) {
           console.log('Answer field:', parsedData.response)
-          setAnswer(parsedData.response)
+          const answer = parsedData.response
+          requestTTS(transcription, audioUrl, answer) // Send the answer to TTS
+
+          // Update results to include the new data
+          setResults((prevResults) => [
+            ...prevResults,
+            {
+              transcription,
+              audioUrl,
+              answer,
+              audioSrc: '', // This will be updated by the TTS request
+            },
+          ])
         } else {
           console.error('No response field in parsed data:', parsedData)
-          setAnswer('Error: No response found in the API data.')
+          throw new Error('No response field in parsed data')
         }
       })
       .catch((error) => {
         console.error('Error during answer processing:', error)
-        setAnswer(`Error processing your request: ${error.message}`)
+        setResults((prevResults) => [
+          ...prevResults,
+          {
+            transcription,
+            audioUrl,
+            answer: 'Error processing answer', // Provide a more descriptive error or the error message
+            audioSrc: '',
+          },
+        ])
       })
   }
 
-  const requestTTS = (text) => {
+  const requestTTS = (transcription, audioUrl, answer) => {
+    if (!answer) {
+      console.error('No answer provided for TTS')
+      return
+    }
+
     fetch('http://localhost:5000/api/tts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text: answer }), // Ensure this matches server expectation
     })
-      .then((response) => response.blob())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        return response.blob()
+      })
       .then((blob) => {
-        const url = URL.createObjectURL(blob)
-        setAudioSrc(url)
+        const audioSrc = URL.createObjectURL(blob)
+        setResults([...results, { transcription, audioUrl, answer, audioSrc }])
+        setIsProcessing(false)
       })
       .catch((error) => {
         console.error('Error fetching audio:', error)
+        setResults([
+          ...results,
+          { transcription, audioUrl, answer, audioSrc: '' },
+        ])
+        setIsProcessing(false)
       })
   }
-
-  useEffect(() => {
-    if (answer) {
-      requestTTS(answer)
-    }
-  }, [answer])
 
   const stopRecording = () => {
     setIsRecording(false)
@@ -145,28 +198,90 @@ const VoiceAssistantPage = () => {
     <>
       <div className='flex flex-col items-center justify-center h-screen bg-blue-100'>
         <VoiceButton onClick={handleRecording} isRecording={isRecording} />
-        {audioUrl && (
-          <a
-            href={audioUrl}
-            download='recording.webm'
-            className='mt-4 text-lg text-blue-700'>
-            Download Recorded Audio
-          </a>
+        {isProcessing && (
+          <p className='text-lg text-gray-700 mt-2'>Processing...</p>
         )}
-        {transcription && (
-          <p className='mt-4 text-lg text-blue-700'>
-            Transcription: {transcription}
-          </p>
-        )}
-        {answer && (
-          <p className='mt-4 text-lg text-blue-700'>Answer: {answer}</p>
-        )}
-        {audioSrc && (
-          <button
-            onClick={handlePlayAudio}
-            className='mt-4 bg-blue-500 text-white py-2 px-4 rounded'>
-            Play Answer
-          </button>
+        <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg'>
+          <table className='w-full text-sm text-left text-gray-500'>
+            <thead className='text-xs text-gray-700 uppercase bg-gray-50'>
+              <tr>
+                <th scope='col' className='py-3 px-6'>
+                  Transcription
+                </th>
+                <th scope='col' className='py-3 px-6'>
+                  Download Audio
+                </th>
+                <th scope='col' className='py-3 px-6'>
+                  Answer
+                </th>
+                <th scope='col' className='py-3 px-6'>
+                  Play Answer
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((result, index) => (
+                <tr key={index} className='bg-white border-b'>
+                  <td className='py-4 px-6'>
+                    {result.transcription.length > 70 ? (
+                      <>
+                        {result.transcription.substring(0, 70)}...
+                        <button
+                          onClick={() => handleModal(result.transcription)}
+                          className='text-blue-600 hover:underline'>
+                          More...
+                        </button>
+                      </>
+                    ) : (
+                      result.transcription
+                    )}
+                  </td>
+                  <td className='py-4 px-6'>
+                    <a
+                      href={result.audioUrl}
+                      download
+                      className='text-blue-600 hover:underline'>
+                      Download
+                    </a>
+                  </td>
+                  <td className='py-4 px-6'>
+                    {result.answer.length > 70 ? (
+                      <>
+                        {result.answer.substring(0, 70)}...
+                        <button
+                          onClick={() => handleModal(result.answer)}
+                          className='text-blue-600 hover:underline'>
+                          More...
+                        </button>
+                      </>
+                    ) : (
+                      result.answer
+                    )}
+                  </td>
+                  <td className='py-4 px-6'>
+                    <button
+                      onClick={() => handlePlayAudio(index)}
+                      className='text-blue-600 hover:underline'>
+                      {results[index].buttonText || 'Play'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {modalOpen && (
+          <div className='absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center'>
+            <div className='bg-white p-8 rounded-lg'>
+              <h2 className='text-lg font-bold'>Full Text</h2>
+              <p className='mb-4'>{modalContent}</p>
+              <button
+                onClick={closeModal}
+                className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'>
+                Close
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </>

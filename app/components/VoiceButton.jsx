@@ -50,7 +50,7 @@ const VoiceButton = ({ onClick, isRecording }) => {
   return (
     <div className={styles['voice-button-container']}>
       <div className={styles.callout}>
-        {isRecording ? 'Speak now, tap to stop' : 'Tap to Speak'}
+        {isRecording ? 'Speak now' : 'Tap to Speak'}
       </div>
       <button
         onClick={onClick}
