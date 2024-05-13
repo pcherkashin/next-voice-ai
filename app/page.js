@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import VoiceButton from './components/VoiceButton'
+import { FaClipboard } from 'react-icons/fa'
 
 const VoiceAssistantPage = () => {
   const [isRecording, setIsRecording] = useState(false)
@@ -17,14 +18,15 @@ const VoiceAssistantPage = () => {
 
     if (!result.isPlaying) {
       result.audio = new Audio(result.audioSrc)
-      result.audio.play()
       result.isPlaying = true
       result.buttonText = 'Stop'
+      setResults([...resultsCopy]) // Update the state before playing audio
+
+      result.audio.play()
       result.audio.onended = () => {
-        // Ensure this event is set correctly
         result.isPlaying = false
         result.buttonText = 'Play'
-        setResults([...resultsCopy]) // Update the state to trigger a re-render
+        setResults([...resultsCopy]) // Update the state after audio ends
       }
     } else {
       if (result.audio) {
@@ -45,6 +47,11 @@ const VoiceAssistantPage = () => {
   const closeModal = () => {
     setModalOpen(false)
     setModalContent('')
+  }
+
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(modalContent)
+    console.log('Text copied to clipboard!')
   }
 
   const handleRecording = () => {
@@ -123,10 +130,12 @@ const VoiceAssistantPage = () => {
 
         if (parsedData && parsedData.response) {
           console.log('Answer field:', parsedData.response)
-          const answer = parsedData.response
-          requestTTS(transcription, audioUrl, answer) // Send the answer to TTS
+          const answer =
+            typeof parsedData.response === 'string'
+              ? parsedData.response
+              : JSON.stringify(parsedData.response)
 
-          // Update results to include the new data
+          // Update results to include the new data before TTS request
           setResults((prevResults) => [
             ...prevResults,
             {
@@ -136,6 +145,8 @@ const VoiceAssistantPage = () => {
               audioSrc: '', // This will be updated by the TTS request
             },
           ])
+
+          requestTTS(transcription, audioUrl, answer) // Send the answer to TTS
         } else {
           console.error('No response field in parsed data:', parsedData)
           throw new Error('No response field in parsed data')
@@ -176,15 +187,20 @@ const VoiceAssistantPage = () => {
       })
       .then((blob) => {
         const audioSrc = URL.createObjectURL(blob)
-        setResults([...results, { transcription, audioUrl, answer, audioSrc }])
+        setResults((prevResults) => {
+          const updatedResults = [...prevResults]
+          updatedResults[updatedResults.length - 1].audioSrc = audioSrc
+          return updatedResults
+        })
         setIsProcessing(false)
       })
       .catch((error) => {
         console.error('Error fetching audio:', error)
-        setResults([
-          ...results,
-          { transcription, audioUrl, answer, audioSrc: '' },
-        ])
+        setResults((prevResults) => {
+          const updatedResults = [...prevResults]
+          updatedResults[updatedResults.length - 1].audioSrc = ''
+          return updatedResults
+        })
         setIsProcessing(false)
       })
   }
@@ -192,6 +208,44 @@ const VoiceAssistantPage = () => {
   const stopRecording = () => {
     setIsRecording(false)
     mediaRecorderRef.current.stop()
+  }
+
+  const renderAnswer = (answer) => {
+    if (typeof answer === 'string') {
+      return <p>{answer}</p>
+    }
+
+    if (typeof answer === 'object') {
+      return (
+        <div>
+          {answer.title && <h3 className='font-bold'>{answer.title}</h3>}
+          {answer.introduction && <p>{answer.introduction}</p>}
+          {answer.ingredients && (
+            <div>
+              <h4 className='font-bold'>Ingredients</h4>
+              <ul>
+                {answer.ingredients.map((ingredient, index) => (
+                  <li key={index}>{ingredient}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {answer.instructions && (
+            <div>
+              <h4 className='font-bold'>Instructions</h4>
+              <ol>
+                {answer.instructions.map((instruction, index) => (
+                  <li key={index}>{instruction}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+          {answer.conclusion && <p>{answer.conclusion}</p>}
+        </div>
+      )
+    }
+
+    return null
   }
 
   return (
@@ -212,7 +266,7 @@ const VoiceAssistantPage = () => {
                   Download Audio
                 </th>
                 <th scope='col' className='py-3 px-6'>
-                  Answer
+                  Answer Text
                 </th>
                 <th scope='col' className='py-3 px-6'>
                   Play Answer
@@ -245,7 +299,8 @@ const VoiceAssistantPage = () => {
                     </a>
                   </td>
                   <td className='py-4 px-6'>
-                    {result.answer.length > 70 ? (
+                    {typeof result.answer === 'string' &&
+                    result.answer.length > 70 ? (
                       <>
                         {result.answer.substring(0, 70)}...
                         <button
@@ -255,7 +310,7 @@ const VoiceAssistantPage = () => {
                         </button>
                       </>
                     ) : (
-                      result.answer
+                      renderAnswer(result.answer)
                     )}
                   </td>
                   <td className='py-4 px-6'>
@@ -273,11 +328,18 @@ const VoiceAssistantPage = () => {
         {modalOpen && (
           <div className='absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center'>
             <div className='bg-white p-8 rounded-lg w-11/12 max-w-lg'>
-              <h2 className='text-lg font-bold mb-4'>Full Text</h2>
-              <p className='mb-4'>{modalContent}</p>
+              <div className='flex justify-between items-center mb-4'>
+                <h2 className='text-lg font-bold'>Full Text</h2>
+                <button
+                  onClick={handleCopyToClipboard}
+                  className='text-blue-500 hover:text-blue-700'>
+                  <FaClipboard size={20} />
+                </button>
+              </div>
+              {renderAnswer(modalContent)}
               <button
                 onClick={closeModal}
-                className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mx-auto block'>
+                className='bg-blue-500 hover:bg-blue-700 text-white font-bold mt-4 py-2 px-4 rounded mx-auto block'>
                 Close
               </button>
             </div>

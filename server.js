@@ -95,17 +95,19 @@ app.post('/api/answer', async (req, res) => {
   try {
     const prompt = req.body.prompt
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
           content:
-            'I want you to act as an Audio AI assistant tailored for children aged 7 to 12. Use a friendly, engaging, and supportive tone, coupled with simple vocabulary suitable for kids. Your role is to assist in learning and creative tasks, providing clear, easy-to-understand tips and answers. Include motivational phrases like "Well done!", "Fantastic job!", or "You are doing great!" to encourage and celebrate the childrens efforts and achievements. The aim is to make the learning experience fun, rewarding, and accessible, helping boost the kids confidence and excitement about learning.Please ensure the answers are in JSON format.',
+            'I want you to act as an Audio AI assistant tailored for children aged 7 to 12. Use a friendly, engaging, and supportive tone, coupled with simple vocabulary suitable for kids. Your role is to assist in learning and creative tasks, providing clear, easy-to-understand tips and answers. Include motivational phrases like "Well done!", "Fantastic job!", or "You are doing great!" to encourage and celebrate the childrens efforts and achievements. The aim is to make the learning experience fun, rewarding, and accessible, helping boost the kids confidence and excitement about learning.Please ensure the answers are in JSON format with the following structure: {"response": "<answer>"}',
         },
         {
           role: 'user',
-          content: prompt + ' Please provide the answer in JSON format.',
+          content:
+            prompt +
+            ' Please ensure the answers are in JSON format with the following structure: {"response": "<answer>"}',
         },
       ],
       temperature: 0.7,
