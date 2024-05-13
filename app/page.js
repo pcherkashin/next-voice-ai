@@ -272,12 +272,12 @@ const VoiceAssistantPage = () => {
         </div>
         {modalOpen && (
           <div className='absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center'>
-            <div className='bg-white p-8 rounded-lg'>
-              <h2 className='text-lg font-bold'>Full Text</h2>
+            <div className='bg-white p-8 rounded-lg w-11/12 max-w-lg'>
+              <h2 className='text-lg font-bold mb-4'>Full Text</h2>
               <p className='mb-4'>{modalContent}</p>
               <button
                 onClick={closeModal}
-                className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'>
+                className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mx-auto block'>
                 Close
               </button>
             </div>
