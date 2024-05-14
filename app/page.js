@@ -1,5 +1,4 @@
-'use client'
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import VoiceButton from './components/VoiceButton'
 import { FaClipboard } from 'react-icons/fa'
 
@@ -11,6 +10,20 @@ const VoiceAssistantPage = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const mediaRecorderRef = useRef(null)
   let audioChunks = []
+
+  useEffect(() => {
+    navigator.permissions
+      .query({ name: 'microphone' })
+      .then((permissionStatus) => {
+        console.log('Microphone permission status:', permissionStatus.state)
+        permissionStatus.onchange = () => {
+          console.log(
+            'Microphone permission status changed to:',
+            permissionStatus.state
+          )
+        }
+      })
+  }, [])
 
   const handlePlayAudio = (index) => {
     const resultsCopy = [...results]
@@ -51,7 +64,7 @@ const VoiceAssistantPage = () => {
 
   const handleCopyToClipboard = () => {
     navigator.clipboard.writeText(modalContent)
-    console.log('Text copied to clipboard!')
+    alert('Text copied to clipboard!')
   }
 
   const handleRecording = () => {
@@ -63,13 +76,49 @@ const VoiceAssistantPage = () => {
   }
 
   const startRecording = () => {
-    setIsRecording(true)
-    setIsProcessing(true)
+    navigator.permissions
+      .query({ name: 'microphone' })
+      .then((permissionStatus) => {
+        if (permissionStatus.state === 'denied') {
+          alert(
+            'Microphone access is denied. Please enable it in your browser settings.'
+          )
+          return
+        }
 
+        if (permissionStatus.state === 'prompt') {
+          navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+              stream.getTracks().forEach((track) => track.stop())
+            })
+            .catch((error) => {
+              console.error('Error accessing media devices:', error)
+              alert(
+                'Could not access the microphone. Please check your permissions.'
+              )
+              setIsProcessing(false)
+              setIsRecording(false)
+              return
+            })
+        }
+
+        setIsRecording(true)
+        setIsProcessing(true)
+        const mimeType = 'audio/webm;codecs=opus'
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          startMediaRecorder(mimeType)
+        } else {
+          startMobileRecording()
+        }
+      })
+  }
+
+  const startMediaRecorder = (mimeType) => {
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
-        const options = { mimeType: 'audio/webm;codecs=opus' }
+        const options = { mimeType }
         const mediaRecorder = new MediaRecorder(stream, options)
         mediaRecorderRef.current = mediaRecorder
         mediaRecorder.start()
@@ -81,7 +130,38 @@ const VoiceAssistantPage = () => {
         }
 
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+          const audioBlob = new Blob(audioChunks, { type: mimeType })
+          const audioUrl = URL.createObjectURL(audioBlob)
+          audioChunks = []
+
+          handleTranscription(audioUrl, audioBlob)
+        }
+      })
+      .catch((error) => {
+        console.error('Error accessing media devices:', error)
+        alert('Could not access the microphone. Please check your permissions.')
+        setIsProcessing(false)
+        setIsRecording(false)
+      })
+  }
+
+  const startMobileRecording = () => {
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        const options = { mimeType: 'audio/mp4' }
+        const mediaRecorder = new MediaRecorder(stream, options)
+        mediaRecorderRef.current = mediaRecorder
+        mediaRecorder.start()
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data)
+          }
+        }
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' })
           const audioUrl = URL.createObjectURL(audioBlob)
           audioChunks = []
 
@@ -100,7 +180,7 @@ const VoiceAssistantPage = () => {
     const formData = new FormData()
     formData.append(
       'audioData',
-      new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
+      new File([audioBlob], 'recording.mp4', { type: 'audio/mp4' })
     )
 
     fetch('http://localhost:5000/api/transcribe', {
@@ -175,12 +255,15 @@ const VoiceAssistantPage = () => {
       return
     }
 
+    // Convert the answer to a string if it is an object
+    const text = typeof answer === 'string' ? answer : JSON.stringify(answer)
+
     fetch('http://localhost:5000/api/tts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text: answer }), // Ensure this matches server expectation
+      body: JSON.stringify({ text }), // Ensure this matches server expectation
     })
       .then((response) => {
         if (!response.ok) {
