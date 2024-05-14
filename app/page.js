@@ -88,8 +88,10 @@ const VoiceAssistantPage = () => {
         }
       })
       .catch((error) => {
-        console.error('Error during transcription:', error)
+        console.error('Error accessing media devices:', error)
+        alert('Could not access the microphone. Please check your permissions.')
         setIsProcessing(false)
+        setIsRecording(false)
       })
   }
 
@@ -255,8 +257,8 @@ const VoiceAssistantPage = () => {
         {isProcessing && (
           <p className='text-lg text-gray-700 mt-2'>Processing...</p>
         )}
-        <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg'>
-          <table className='w-full text-sm text-left text-gray-500'>
+        <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg table-container'>
+          <table className='w-full text-sm text-left text-gray-500 table'>
             <thead className='text-xs text-gray-700 uppercase bg-gray-50'>
               <tr>
                 <th scope='col' className='py-3 px-6'>
@@ -327,8 +329,8 @@ const VoiceAssistantPage = () => {
         </div>
         {modalOpen && (
           <div className='absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center'>
-            <div className='bg-white p-8 rounded-lg w-11/12 max-w-lg'>
-              <div className='flex justify-between items-center mb-4'>
+            <div className='bg-white p-8 rounded-lg w-11/12 max-w-lg modal-content'>
+              <div className='flex justify-between items-center mb-4 flex-container'>
                 <h2 className='text-lg font-bold'>Full Text</h2>
                 <button
                   onClick={handleCopyToClipboard}
