@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import VoiceButton from './components/VoiceButton'
 import { FaClipboard } from 'react-icons/fa'
 
@@ -11,20 +11,6 @@ const VoiceAssistantPage = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const mediaRecorderRef = useRef(null)
   let audioChunks = []
-
-  useEffect(() => {
-    navigator.permissions
-      .query({ name: 'microphone' })
-      .then((permissionStatus) => {
-        console.log('Microphone permission status:', permissionStatus.state)
-        permissionStatus.onchange = () => {
-          console.log(
-            'Microphone permission status changed to:',
-            permissionStatus.state
-          )
-        }
-      })
-  }, [])
 
   const handlePlayAudio = (index) => {
     const resultsCopy = [...results]
@@ -65,7 +51,7 @@ const VoiceAssistantPage = () => {
 
   const handleCopyToClipboard = () => {
     navigator.clipboard.writeText(modalContent)
-    alert('Text copied to clipboard!')
+    console.log('Text copied to clipboard!')
   }
 
   const handleRecording = () => {
@@ -77,55 +63,12 @@ const VoiceAssistantPage = () => {
   }
 
   const startRecording = () => {
-    navigator.permissions
-      .query({ name: 'microphone' })
-      .then((permissionStatus) => {
-        if (permissionStatus.state === 'denied') {
-          alert(
-            'Microphone access is denied. Please enable it in your browser settings.'
-          )
-          return
-        }
-
-        if (permissionStatus.state === 'prompt') {
-          navigator.mediaDevices
-            .getUserMedia({ audio: true })
-            .then((stream) => {
-              stream.getTracks().forEach((track) => track.stop())
-            })
-            .catch((error) => {
-              console.error('Error accessing media devices:', error)
-              alert(
-                'Could not access the microphone. Please check your permissions.'
-              )
-              setIsProcessing(false)
-              setIsRecording(false)
-              return
-            })
-        }
-
-        setIsRecording(true)
-        setIsProcessing(true)
-        const mimeType = 'audio/webm;codecs=opus'
-        if (MediaRecorder.isTypeSupported(mimeType)) {
-          startMediaRecorder(mimeType)
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          startMediaRecorder('audio/mp4')
-        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-          startMediaRecorder('audio/aac')
-        } else {
-          alert('No supported audio format found')
-          setIsProcessing(false)
-          setIsRecording(false)
-        }
-      })
-  }
-
-  const startMediaRecorder = (mimeType) => {
+    setIsRecording(true)
+    setIsProcessing(true)
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
-        const options = { mimeType }
+        const options = { mimeType: 'audio/webm;codecs=opus' }
         const mediaRecorder = new MediaRecorder(stream, options)
         mediaRecorderRef.current = mediaRecorder
         mediaRecorder.start()
@@ -137,7 +80,7 @@ const VoiceAssistantPage = () => {
         }
 
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: mimeType })
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
           const audioUrl = URL.createObjectURL(audioBlob)
           audioChunks = []
 
@@ -145,41 +88,8 @@ const VoiceAssistantPage = () => {
         }
       })
       .catch((error) => {
-        console.error('Error accessing media devices:', error)
-        alert('Could not access the microphone. Please check your permissions.')
+        console.error('Error during transcription:', error)
         setIsProcessing(false)
-        setIsRecording(false)
-      })
-  }
-
-  const startMobileRecording = () => {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        const options = { mimeType: 'audio/x-m4a' }
-        const mediaRecorder = new MediaRecorder(stream, options)
-        mediaRecorderRef.current = mediaRecorder
-        mediaRecorder.start()
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunks.push(event.data)
-          }
-        }
-
-        mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/x-m4a' })
-          const audioUrl = URL.createObjectURL(audioBlob)
-          audioChunks = []
-
-          handleTranscription(audioUrl, audioBlob)
-        }
-      })
-      .catch((error) => {
-        console.error('Error accessing media devices:', error)
-        alert('Could not access the microphone. Please check your permissions.')
-        setIsProcessing(false)
-        setIsRecording(false)
       })
   }
 
@@ -187,9 +97,7 @@ const VoiceAssistantPage = () => {
     const formData = new FormData()
     formData.append(
       'audioData',
-      new File([audioBlob], `recording.${audioBlob.type.split('/')[1]}`, {
-        type: audioBlob.type,
-      })
+      new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
     )
 
     fetch('http://localhost:5000/api/transcribe', {
@@ -264,15 +172,12 @@ const VoiceAssistantPage = () => {
       return
     }
 
-    // Convert the answer to a string if it is an object
-    const text = typeof answer === 'string' ? answer : JSON.stringify(answer)
-
     fetch('http://localhost:5000/api/tts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text }), // Ensure this matches server expectation
+      body: JSON.stringify({ text: answer }), // Ensure this matches server expectation
     })
       .then((response) => {
         if (!response.ok) {
@@ -350,8 +255,8 @@ const VoiceAssistantPage = () => {
         {isProcessing && (
           <p className='text-lg text-gray-700 mt-2'>Processing...</p>
         )}
-        <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg table-container'>
-          <table className='w-full text-sm text-left text-gray-500 table'>
+        <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg'>
+          <table className='w-full text-sm text-left text-gray-500'>
             <thead className='text-xs text-gray-700 uppercase bg-gray-50'>
               <tr>
                 <th scope='col' className='py-3 px-6'>
@@ -422,8 +327,8 @@ const VoiceAssistantPage = () => {
         </div>
         {modalOpen && (
           <div className='absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center'>
-            <div className='bg-white p-8 rounded-lg w-11/12 max-w-lg modal-content'>
-              <div className='flex justify-between items-center mb-4 flex-container'>
+            <div className='bg-white p-8 rounded-lg w-11/12 max-w-lg'>
+              <div className='flex justify-between items-center mb-4'>
                 <h2 className='text-lg font-bold'>Full Text</h2>
                 <button
                   onClick={handleCopyToClipboard}
