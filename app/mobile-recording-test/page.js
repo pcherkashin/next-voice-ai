@@ -45,8 +45,29 @@ const MobileRecordingTestPage = () => {
         }
 
         setIsRecording(true)
-        const mimeType = 'audio/aac'
-        startMediaRecorder(mimeType)
+        const supportedMimeTypes = [
+          'audio/webm;codecs=opus',
+          'audio/ogg;codecs=opus',
+          'audio/mpeg',
+          'audio/wav',
+          'audio/aac',
+          'audio/mp4',
+        ]
+        let mimeType = ''
+        for (const type of supportedMimeTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            mimeType = type
+            break
+          }
+        }
+
+        if (mimeType) {
+          startMediaRecorder(mimeType)
+        } else {
+          console.error('No supported MIME type found')
+          alert('No supported MIME type found')
+          setIsRecording(false)
+        }
       })
   }
 
