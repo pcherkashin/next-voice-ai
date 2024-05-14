@@ -1,3 +1,4 @@
+'use client'
 import { useState, useEffect, useRef } from 'react'
 import VoiceButton from './components/VoiceButton'
 import { FaClipboard } from 'react-icons/fa'
