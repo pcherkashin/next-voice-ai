@@ -109,8 +109,14 @@ const VoiceAssistantPage = () => {
         const mimeType = 'audio/webm;codecs=opus'
         if (MediaRecorder.isTypeSupported(mimeType)) {
           startMediaRecorder(mimeType)
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          startMediaRecorder('audio/mp4')
+        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+          startMediaRecorder('audio/aac')
         } else {
-          startMobileRecording()
+          alert('No supported audio format found')
+          setIsProcessing(false)
+          setIsRecording(false)
         }
       })
   }
@@ -181,7 +187,9 @@ const VoiceAssistantPage = () => {
     const formData = new FormData()
     formData.append(
       'audioData',
-      new File([audioBlob], 'recording.m4a', { type: 'audio/x-m4a' })
+      new File([audioBlob], `recording.${audioBlob.type.split('/')[1]}`, {
+        type: audioBlob.type,
+      })
     )
 
     fetch('http://localhost:5000/api/transcribe', {
