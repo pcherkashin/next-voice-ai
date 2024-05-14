@@ -150,7 +150,7 @@ const VoiceAssistantPage = () => {
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
-        const options = { mimeType: 'audio/mp4' }
+        const options = { mimeType: 'audio/x-m4a' }
         const mediaRecorder = new MediaRecorder(stream, options)
         mediaRecorderRef.current = mediaRecorder
         mediaRecorder.start()
@@ -162,7 +162,7 @@ const VoiceAssistantPage = () => {
         }
 
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/mp4' })
+          const audioBlob = new Blob(audioChunks, { type: 'audio/x-m4a' })
           const audioUrl = URL.createObjectURL(audioBlob)
           audioChunks = []
 
@@ -181,7 +181,7 @@ const VoiceAssistantPage = () => {
     const formData = new FormData()
     formData.append(
       'audioData',
-      new File([audioBlob], 'recording.mp4', { type: 'audio/mp4' })
+      new File([audioBlob], 'recording.m4a', { type: 'audio/x-m4a' })
     )
 
     fetch('http://localhost:5000/api/transcribe', {
