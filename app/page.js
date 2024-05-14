@@ -65,6 +65,7 @@ const VoiceAssistantPage = () => {
   const startRecording = () => {
     setIsRecording(true)
     setIsProcessing(true)
+
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
