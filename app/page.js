@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import VoiceButton from './components/VoiceButton'
 import { FaClipboard } from 'react-icons/fa'
+import Link from 'next/link'
 
 const VoiceAssistantPage = () => {
   const [isRecording, setIsRecording] = useState(false)
@@ -255,6 +256,9 @@ const VoiceAssistantPage = () => {
         {isProcessing && (
           <p className='text-lg text-gray-700 mt-2'>Processing...</p>
         )}
+        <Link href='/mobile-recording-test' passHref>
+          Click ME
+        </Link>
         <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg'>
           <table className='w-full text-sm text-left text-gray-500'>
             <thead className='text-xs text-gray-700 uppercase bg-gray-50'>
