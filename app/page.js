@@ -151,6 +151,7 @@ const VoiceAssistantPage = () => {
               const audioUrl = URL.createObjectURL(audioBlob)
               audioChunks = []
 
+              console.log('Recording stopped, audio URL:', audioUrl)
               handleTranscription(audioUrl, audioBlob)
             }
           })
@@ -331,7 +332,7 @@ const VoiceAssistantPage = () => {
         {isProcessing && (
           <p className='text-lg text-gray-700 mt-2'>Processing...</p>
         )}
-        {/* <Link href='/mobile-recording-test' passHref>Click ME</Link> */}
+        {/* <Link href='/mobile-recording-test' passHref>Mobile Recording page</Link> */}
         <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg'>
           <table className='w-full text-sm text-left text-gray-500'>
             <thead className='text-xs text-gray-700 uppercase bg-gray-50'>
