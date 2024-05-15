@@ -59,11 +59,15 @@ const VoiceAssistantPage = () => {
     if (isRecording) {
       stopRecording()
     } else {
-      startRecording()
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        startMobileRecording()
+      } else {
+        startWebRecording()
+      }
     }
   }
 
-  const startRecording = () => {
+  const startWebRecording = () => {
     setIsRecording(true)
     setIsProcessing(true)
     navigator.mediaDevices
@@ -91,6 +95,92 @@ const VoiceAssistantPage = () => {
       .catch((error) => {
         console.error('Error during transcription:', error)
         setIsProcessing(false)
+      })
+  }
+
+  const startMobileRecording = () => {
+    setIsRecording(true)
+    setIsProcessing(true)
+    navigator.permissions
+      .query({ name: 'microphone' })
+      .then((permissionStatus) => {
+        console.log('Microphone permission status:', permissionStatus.state)
+
+        if (permissionStatus.state === 'denied') {
+          alert(
+            'Microphone access is denied. Please enable it in your browser settings.'
+          )
+          return
+        }
+
+        if (permissionStatus.state === 'prompt') {
+          navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+              stream.getTracks().forEach((track) => track.stop())
+            })
+            .catch((error) => {
+              console.error('Error accessing media devices:', error)
+              alert(
+                'Could not access the microphone. Please check your permissions.'
+              )
+              setIsRecording(false)
+              return
+            })
+        }
+
+        const supportedMimeTypes = [
+          'audio/webm;codecs=opus',
+          'audio/ogg;codecs=opus',
+          'audio/mpeg',
+          'audio/wav',
+          'audio/aac',
+          'audio/mp4',
+        ]
+        let mimeType = ''
+        for (const type of supportedMimeTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            mimeType = type
+            break
+          }
+        }
+
+        if (mimeType) {
+          navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then((stream) => {
+              const options = { mimeType }
+              const mediaRecorder = new MediaRecorder(stream, options)
+              mediaRecorderRef.current = mediaRecorder
+              mediaRecorder.start()
+              console.log('Recording started with MIME type:', mimeType)
+
+              mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                  audioChunks.push(event.data)
+                }
+              }
+
+              mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: mimeType })
+                const audioUrl = URL.createObjectURL(audioBlob)
+                audioChunks = []
+
+                handleTranscription(audioUrl, audioBlob)
+              }
+            })
+            .catch((error) => {
+              console.error('Error accessing media devices:', error)
+              alert(
+                'Could not access the microphone. Please check your permissions.'
+              )
+              setIsRecording(false)
+            })
+        } else {
+          console.error('No supported MIME type found')
+          alert('No supported MIME type found')
+          setIsRecording(false)
+        }
       })
   }
 
@@ -208,7 +298,9 @@ const VoiceAssistantPage = () => {
 
   const stopRecording = () => {
     setIsRecording(false)
-    mediaRecorderRef.current.stop()
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop()
+    }
   }
 
   const renderAnswer = (answer) => {
@@ -256,9 +348,7 @@ const VoiceAssistantPage = () => {
         {isProcessing && (
           <p className='text-lg text-gray-700 mt-2'>Processing...</p>
         )}
-        <Link href='/mobile-recording-test' passHref>
-          Click ME
-        </Link>
+        {/* <Link href='/mobile-recording-test' passHref>Click ME</Link> */}
         <div className='overflow-x-auto pt-8 relative shadow-md sm:rounded-lg'>
           <table className='w-full text-sm text-left text-gray-500'>
             <thead className='text-xs text-gray-700 uppercase bg-gray-50'>
