@@ -129,66 +129,49 @@ const VoiceAssistantPage = () => {
             })
         }
 
-        const supportedMimeTypes = [
-          'audio/webm;codecs=opus',
-          'audio/ogg;codecs=opus',
-          'audio/mpeg',
-          'audio/wav',
-          'audio/aac',
-          'audio/mp4',
-        ]
-        let mimeType = ''
-        for (const type of supportedMimeTypes) {
-          if (MediaRecorder.isTypeSupported(type)) {
-            mimeType = type
-            break
-          }
-        }
+        const mimeType = 'audio/mp4'
 
-        if (mimeType) {
-          navigator.mediaDevices
-            .getUserMedia({ audio: true })
-            .then((stream) => {
-              const options = { mimeType }
-              const mediaRecorder = new MediaRecorder(stream, options)
-              mediaRecorderRef.current = mediaRecorder
-              mediaRecorder.start()
-              console.log('Recording started with MIME type:', mimeType)
+        navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then((stream) => {
+            const options = { mimeType }
+            const mediaRecorder = new MediaRecorder(stream, options)
+            mediaRecorderRef.current = mediaRecorder
+            mediaRecorder.start()
+            console.log('Recording started with MIME type:', mimeType)
 
-              mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                  audioChunks.push(event.data)
-                }
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                audioChunks.push(event.data)
               }
+            }
 
-              mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: mimeType })
-                const audioUrl = URL.createObjectURL(audioBlob)
-                audioChunks = []
+            mediaRecorder.onstop = () => {
+              const audioBlob = new Blob(audioChunks, { type: mimeType })
+              const audioUrl = URL.createObjectURL(audioBlob)
+              audioChunks = []
 
-                handleTranscription(audioUrl, audioBlob)
-              }
-            })
-            .catch((error) => {
-              console.error('Error accessing media devices:', error)
-              alert(
-                'Could not access the microphone. Please check your permissions.'
-              )
-              setIsRecording(false)
-            })
-        } else {
-          console.error('No supported MIME type found')
-          alert('No supported MIME type found')
-          setIsRecording(false)
-        }
+              handleTranscription(audioUrl, audioBlob)
+            }
+          })
+          .catch((error) => {
+            console.error('Error accessing media devices:', error)
+            alert(
+              'Could not access the microphone. Please check your permissions.'
+            )
+            setIsRecording(false)
+          })
       })
   }
 
   const handleTranscription = (audioUrl, audioBlob) => {
+    const fileType = audioBlob.type.includes('mp4') ? 'audio/mp4' : 'audio/webm'
     const formData = new FormData()
     formData.append(
       'audioData',
-      new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
+      new File([audioBlob], `recording.${fileType.split('/')[1]}`, {
+        type: fileType,
+      })
     )
 
     fetch('http://localhost:5000/api/transcribe', {
