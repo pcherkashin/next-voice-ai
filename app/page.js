@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import VoiceButton from './components/VoiceButton'
 import { FaClipboard } from 'react-icons/fa'
-import Link from 'next/link'
+import { API_BASE_URL } from './apiConfig'
 
 const VoiceAssistantPage = () => {
   const [isRecording, setIsRecording] = useState(false)
@@ -175,7 +175,7 @@ const VoiceAssistantPage = () => {
       })
     )
 
-    fetch('http://localhost:5000/api/transcribe', {
+    fetch(`${API_BASE_URL}/api/transcribe`, {
       method: 'POST',
       body: formData,
     })
@@ -190,7 +190,7 @@ const VoiceAssistantPage = () => {
   }
 
   const handleAnswer = (transcription, audioUrl) => {
-    fetch('http://localhost:5000/api/answer', {
+    fetch(`${API_BASE_URL}/api/answer`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -247,7 +247,7 @@ const VoiceAssistantPage = () => {
       return
     }
 
-    fetch('http://localhost:5000/api/tts', {
+    fetch(`${API_BASE_URL}/api/tts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
